@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -46,45 +46,59 @@ class NotificationService {
   /// Does nothing if the task has no due date, is already completed,
   /// or the notification time is already in the past.
   Future<void> scheduleForTask(Task task) async {
-    if (task.dueDate == null || task.status) return;
+    if (!_initialised || task.dueDate == null || task.status) return;
 
     final fireAt = task.dueDate!.subtract(const Duration(hours: 1));
     if (fireAt.isBefore(DateTime.now())) return;
 
-    final tzFireAt = tz.TZDateTime.from(fireAt, tz.local);
+    try {
+      final tzFireAt = tz.TZDateTime.from(fireAt, tz.local);
 
-    await _plugin.zonedSchedule(
-      task.id.hashCode, // unique int id derived from task UUID
-      'Task due soon!',
-      '"${task.title}" is due in 1 hour',
-      tzFireAt,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'task_due_reminders',
-          'Task Due Reminders',
-          channelDescription: 'Reminds you 1 hour before a task is due',
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
+      await _plugin.zonedSchedule(
+        task.id.hashCode,
+        'Task due soon!',
+        '"${task.title}" is due in 1 hour',
+        tzFireAt,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'task_due_reminders',
+            'Task Due Reminders',
+            channelDescription: 'Reminds you 1 hour before a task is due',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
         ),
-      ),
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      matchDateTimeComponents: null,
-    );
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: null,
+      );
+    } catch (e) {
+      debugPrint('Failed to schedule notification for task ${task.id}: $e');
+    }
   }
 
   /// Cancel the notification for a specific task.
   Future<void> cancelForTask(String taskId) async {
-    await _plugin.cancel(taskId.hashCode);
+    if (!_initialised) return;
+    try {
+      await _plugin.cancel(taskId.hashCode);
+    } catch (e) {
+      debugPrint('Failed to cancel notification: $e');
+    }
   }
 
   /// Cancel all existing notifications, then re-schedule from fresh list.
   Future<void> rescheduleAll(List<Task> tasks) async {
-    await _plugin.cancelAll();
-    for (final task in tasks) {
-      await scheduleForTask(task);
+    if (!_initialised) return;
+    try {
+      await _plugin.cancelAll();
+      for (final task in tasks) {
+        await scheduleForTask(task);
+      }
+    } catch (e) {
+      debugPrint('Failed to reschedule notifications: $e');
     }
   }
 }

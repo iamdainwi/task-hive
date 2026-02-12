@@ -13,7 +13,6 @@ final dioProvider = Provider<Dio>((ref) {
 
   final dio = Dio(
     BaseOptions(
-      // Use 10.0.2.2 for Android emulator → maps to host localhost
       baseUrl: 'https://task-hive-mauve.vercel.app/api',
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
@@ -24,9 +23,13 @@ final dioProvider = Provider<Dio>((ref) {
   dio.interceptors.add(
     InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final token = await storage.read(key: _kTokenKey);
-        if (token != null && token.isNotEmpty) {
-          options.headers['Authorization'] = 'Bearer $token';
+        try {
+          final token = await storage.read(key: _kTokenKey);
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+        } catch (_) {
+          // Secure storage read can fail on first launch — proceed without token
         }
         handler.next(options);
       },

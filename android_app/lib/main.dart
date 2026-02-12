@@ -6,7 +6,15 @@ import 'core/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService.instance.init();
+
+  // Init notifications — wrapped in try-catch so a failure here
+  // never prevents the app from launching.
+  try {
+    await NotificationService.instance.init();
+  } catch (e) {
+    debugPrint('NotificationService init failed: $e');
+  }
+
   runApp(const ProviderScope(child: TaskHiveApp()));
 }
 
